@@ -26,25 +26,45 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r example, echo=TRUE, results=FALSE}
 library(openxlsx) # use openxlsx (no nasty java dependencies)
 library(stringi)
+library(dplyr)
 
 # create workbook and worksheets
-wb <- createWorkbook()
-addWorksheet(wb, "location")
-addWorksheet(wb, "occurrence")
-addWorksheet(wb, "lookup_IDs", visible = FALSE)
+template_file <- "gillnet_survey_template.csv"
+template <- read.csv(paste0("./examples/templates/",template_file))
+worksheets <- unique(template$sheet)
 
-writeDataTable(wb, sheet = 1, x = iris[1:30,])
-writeData(wb, sheet = "lookup_IDs", x = sample(iris$Sepal.Length, 10))
+wb <- createWorkbook()
+
+# add worksheets
+for(i in 1:length(worksheets)){
+  addWorksheet(wb, paste(worksheets[i]))
+}
+
+# add column names
+for(i in 1:length(worksheets)){
+  xxx <- matrix(ncol=length(template$field_name_NO[template$sheet==paste(worksheets[i])])) %>%
+  as.data.frame()
+  names(xxx) <- as.character(template$field_name_NO[template$sheet==paste(worksheets[i])])
+  writeDataTable(wb, sheet = i, x = xxx, firstColumn=TRUE)
+}
+
+
+# add lookupdata
+
+
+
+#writeDataTable(wb, sheet = 1, x = iris[1:30,])
+#writeData(wb, sheet = "lookup_IDs", x = sample(iris$Sepal.Length, 10))
 
 # enter datavalidation rules
-dataValidation(wb, 1, col = 1, rows = 2:31, type = "list", value = "'Sheet 2'!$A$1:$A$10")
+#dataValidation(wb, 1, col = 1, rows = 2:31, type = "list", value = "'Sheet 2'!$A$1:$A$10")
 
 # random unique code for each workbook download
 workbookID <- stri_rand_strings(1,4,pattern="[A-Za-z0-9]") 
 workbook_name <- paste0("testform_",workbookID,".xlsx")
 
 # save/ dowload workbook
-# saveWorkbook(wb, workbook_name, overwrite = TRUE)
+saveWorkbook(wb, workbook_name, overwrite = TRUE)
 
 
 

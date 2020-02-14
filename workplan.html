@@ -212,25 +212,53 @@ $(document).ready(function () {
 <h3>Example</h3>
 <pre class="r"><code>library(openxlsx) # use openxlsx (no nasty java dependencies)
 library(stringi)
+library(dplyr)</code></pre>
+<pre><code>## 
+## Attaching package: 'dplyr'</code></pre>
+<pre><code>## The following objects are masked from 'package:stats':
+## 
+##     filter, lag</code></pre>
+<pre><code>## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code># create workbook and worksheets
+template_file &lt;- &quot;gillnet_survey_template.csv&quot;
+template &lt;- read.csv(paste0(&quot;./examples/templates/&quot;,template_file))
+worksheets &lt;- unique(template$sheet)
 
-# create workbook and worksheets
 wb &lt;- createWorkbook()
-addWorksheet(wb, &quot;location&quot;)
-addWorksheet(wb, &quot;occurrence&quot;)
-addWorksheet(wb, &quot;lookup_IDs&quot;, visible = FALSE)
 
-writeDataTable(wb, sheet = 1, x = iris[1:30,])
-writeData(wb, sheet = &quot;lookup_IDs&quot;, x = sample(iris$Sepal.Length, 10))
+# add worksheets
+for(i in 1:length(worksheets)){
+  addWorksheet(wb, paste(worksheets[i]))
+}
+
+# add column names
+for(i in 1:length(worksheets)){
+  xxx &lt;- matrix(ncol=length(template$field_name_NO[template$sheet==paste(worksheets[i])])) %&gt;%
+  as.data.frame()
+  names(xxx) &lt;- as.character(template$field_name_NO[template$sheet==paste(worksheets[i])])
+  writeDataTable(wb, sheet = i, x = xxx, firstColumn=TRUE)
+}
+
+
+# add lookupdata
+
+
+
+#writeDataTable(wb, sheet = 1, x = iris[1:30,])
+#writeData(wb, sheet = &quot;lookup_IDs&quot;, x = sample(iris$Sepal.Length, 10))
 
 # enter datavalidation rules
-dataValidation(wb, 1, col = 1, rows = 2:31, type = &quot;list&quot;, value = &quot;'Sheet 2'!$A$1:$A$10&quot;)
+#dataValidation(wb, 1, col = 1, rows = 2:31, type = &quot;list&quot;, value = &quot;'Sheet 2'!$A$1:$A$10&quot;)
 
 # random unique code for each workbook download
 workbookID &lt;- stri_rand_strings(1,4,pattern=&quot;[A-Za-z0-9]&quot;) 
 workbook_name &lt;- paste0(&quot;testform_&quot;,workbookID,&quot;.xlsx&quot;)
 
 # save/ dowload workbook
-# saveWorkbook(wb, workbook_name, overwrite = TRUE)</code></pre>
+saveWorkbook(wb, workbook_name, overwrite = TRUE)</code></pre>
+<pre><code>## Note: zip::zip() is deprecated, please use zip::zipr() instead</code></pre>
 </div>
 </div>
 
