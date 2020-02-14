@@ -1,0 +1,52 @@
+---
+title: "Workplan"
+author: "Anders G. Finstad"
+date: "February 14, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data capture forms
+
+### Rationale / idea
+
+* While DwC and the DwC-A is nice for data publishing, archiving and exchange, it's often not possible to or wanted to punch (a.k.a. enter your data into this format directly).
+
+* Standarized and documented forms (spredsheets) for entering data from the most used ecological sampling technices would eases the process of writing mapping rutines for publishing data
+
+* Forms (spreadsheets) should contain validatation rules to ensure minimum of work afterwards 
+
+* Generators developed in R and implementented in shiny
+
+### Example
+
+```{r example, echo=TRUE, results=FALSE}
+library(openxlsx) # use openxlsx (no nasty java dependencies)
+library(stringi)
+
+# create workbook and worksheets
+wb <- createWorkbook()
+addWorksheet(wb, "location")
+addWorksheet(wb, "occurrence")
+addWorksheet(wb, "lookup_IDs", visible = FALSE)
+
+writeDataTable(wb, sheet = 1, x = iris[1:30,])
+writeData(wb, sheet = "lookup_IDs", x = sample(iris$Sepal.Length, 10))
+
+# enter datavalidation rules
+dataValidation(wb, 1, col = 1, rows = 2:31, type = "list", value = "'Sheet 2'!$A$1:$A$10")
+
+# random unique code for each workbook download
+workbookID <- stri_rand_strings(1,4,pattern="[A-Za-z0-9]") 
+workbook_name <- paste0("testform_",workbookID,".xlsx")
+
+# save/ dowload workbook
+# saveWorkbook(wb, workbook_name, overwrite = TRUE)
+
+
+
+```
+
