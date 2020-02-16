@@ -29,18 +29,18 @@ library(stringi)
 library(dplyr)
 
 # create workbook and worksheets
-template_file <- "gillnet_survey_template.csv"
-template <- read.csv(paste0("./examples/templates/",template_file))
+template_file <- "./data/templates/gillnet-surveys/NINA_gillnet_survey_template.csv"
+template <- read.csv(template_file)
 worksheets <- unique(template$sheet)
 
 wb <- createWorkbook()
 
-# add worksheets
+## add worksheets
 for(i in 1:length(worksheets)){
   addWorksheet(wb, paste(worksheets[i]))
 }
 
-# add column names
+## add column names
 for(i in 1:length(worksheets)){
   xxx <- matrix(ncol=length(template$field_name_NO[template$sheet==paste(worksheets[i])])) %>%
   as.data.frame()
@@ -48,6 +48,7 @@ for(i in 1:length(worksheets)){
   writeDataTable(wb, sheet = i, x = xxx, firstColumn=TRUE)
 }
 
+# add IDs 
 
 # add lookupdata
 
@@ -62,7 +63,7 @@ for(i in 1:length(worksheets)){
 # random unique code for each workbook download
 workbookID <- stri_rand_strings(1,4,pattern="[A-Za-z0-9]") 
 workbook_name <- paste0("testform_",workbookID,".xlsx")
-
+workbook_name <- "testform.xlsx"
 # save/ dowload workbook
 saveWorkbook(wb, workbook_name, overwrite = TRUE)
 
