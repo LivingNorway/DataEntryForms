@@ -1,0 +1,31 @@
+ParameterID,Navn
+FIANTLLE ,Antall individer fisk (art) innen en gitt lengdegruppe
+FIANTLVE ,Antall individer fisk (art) innen en gitt vektklasse
+FIGYTE ,Antall gytegroper
+FIKOND ,Kondisjonsfaktor for fisk (art)
+FILENG ,Lengde enkeltindivid fisk (art)
+FILENGAL ,Gjennomsnittlig lengde av fisk (art) innen en gitt aldersgruppe
+FITETHAR ,Estimert antall fisk (art) per arealenhet
+FITETHIN ,Estimert antall fisk (art) per innsatsenhet
+FITETHTOAR ,Estimert totalt antall fisk per arealenhet
+FITETHTOIN ,Estimert totalt antall fisk per innsatsenhet
+FIVEKT ,Vekt enkeltindivid fisk (art)
+FIVEKTAL ,Gjennomsnittlig vekt av fisk (art) innen en gitt aldersgruppe
+FIVEKTAR ,Vekt fisk (art) per arealenhet
+FIVEKTIN ,Vekt fisk (art) per innsatsenhet
+FIVEKTTOIN ,Totalvekt fisk per innsatsenhet
+FIALD ,Alder enkeltindivid fisk (art)
+FIANTLAL ,Antall individer fisk (art) innen en gitt aldersgruppe
+FIBESTE ,Bestandsendring fisk
+FIGYTEOBS ,Gyteforhold
+FIOPPR ,Opprinnelse
+FITETHSK ,Fisketetthet observert
+FIAFOR ,Forekomst av arter fisk
+FIEOVL ,Eggoverlevelse
+FIWS_FBI ,Pelagisk fiskeindeks (WS-FBI)
+FINEFI ,Norsk endringsindeks for fisk (NEFI)
+FIAINDW5 ,Fiskebestandsindeks forsuring (AindexW5)
+FIEINDW3 ,Fiskebestandsindeks eutrofiering (EindexW3)
+FITRUGR ,Trusselgrad fisk
+FIGYTEOMR ,Gyteområde
+FIANTL ,Antall individer fisk (art)

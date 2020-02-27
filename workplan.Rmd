@@ -21,23 +21,42 @@ knitr::opts_chunk$set(echo = TRUE)
 
 * Generators developed in R and implementented in shiny
 
-### Example
+### Worlflow
 
-```{r example, echo=TRUE, results=FALSE}
+#### 1. load libraries and set define input parameters (template etc.)
+```{r input_param, echo=TRUE, results=FALSE}
 library(openxlsx) # use openxlsx (no nasty java dependencies)
 library(stringi)
+library(stringr)
 library(dplyr)
+library(uuid)
+
+# innstillinger
+template_file <- "./data/templates/gillnet-surveys/NINA_gillnet_survey_template.csv"
+maxN <- 100
+template_folder <- "./data/templates/gillnet-surveys/"
+
+## header style
+hs <- createStyle(fontColour = "#ffffff", fgFill = "#4F80BD", halign = "center", valign = "center", textDecoration = "Bold", border = "TopBottomLeftRight", textRotation = 90)
+
+```
+
+#### 2. Create workbook, sheets and column names 
+
+
+```{r create_workbook, echo=TRUE, results=FALSE}
 
 # create workbook and worksheets
-template_file <- "./data/templates/gillnet-surveys/NINA_gillnet_survey_template.csv"
 template <- read.csv(template_file)
 worksheets <- unique(template$sheet)
 
 wb <- createWorkbook()
 
+
 ## add worksheets
 for(i in 1:length(worksheets)){
   addWorksheet(wb, paste(worksheets[i]))
+  setColWidths(wb, sheet = paste(worksheets[i]), cols=1:100, widths = "auto")
 }
 
 ## add column names
@@ -45,26 +64,201 @@ for(i in 1:length(worksheets)){
   xxx <- matrix(ncol=length(template$field_name_NO[template$sheet==paste(worksheets[i])])) %>%
   as.data.frame()
   names(xxx) <- as.character(template$field_name_NO[template$sheet==paste(worksheets[i])])
-  writeDataTable(wb, sheet = i, x = xxx, firstColumn=TRUE)
+  writeDataTable(wb, sheet = i, x = xxx, firstColumn=TRUE)#, headerStyle=hs)
 }
 
-# add IDs 
+```
 
-# add lookupdata
+#### 3. add data-validation, lookup columns etc..
+
+Loops trough the "validation" column of the template sheet
+
+* ID:UUID - generates a set of UUIDs (of length maxN) to be used as GUIDs for the ID, stores the resulting IDs in sepparate lookup sheets
+* '*.csv' - looks for files with controlled vocabulary. Using the first column of the table as refference
+* must_contain - column must contain value, typically refferenceing ID of highter hiarcical structure 
+* unique - value must be unique (typically ID columns)
+
+```{r lookup_etc, echo=TRUE, results=FALSE}
+
+
+##--------------------------------------
+## add lookupdata and data validatation
+##--------------------------------------
+
+for(i in 1:length(template$validation)){
+  
+  ###-------------------------------------------
+  ### IDs - add UUID if validation = lookup:UUID
+  ###-------------------------------------------
+  if(template$validation[i]=="ID:UUID"){
+    addWorksheet(wb, paste0("l_",template$field_name_NO[i]))
+    writeData(wb, sheet = paste0("l_",template$field_name_NO[i]), 
+              x = c(paste(template$field_name_NO[i]),sapply(seq_along(1:maxN), UUIDgenerate))
+    )
+  }
+  
+
+  ###--------------------------------------------------------------------------
+  ### lookup tables: add validation from controlled vocabulary attached as file
+  ###--------------------------------------------------------------------------
+    if(template$validation[i] %in% list.files(template_folder)){
+      #### add lookupdata
+      sheet_name_i <- str_sub(template$validation[i], end = -5)
+      sheet_content <- read.csv(paste0(template_folder,"/",template$validation[i]))
+      addWorksheet(wb, sheetName=sheet_name_i)
+      writeDataTable(wb, sheet = sheet_name_i, x = sheet_content)
+      
+      ####-------------------
+      #### add datavalidation
+      ####-------------------
+      template_sheet_i <- template %>%
+        filter(sheet == template$sheet[i])
+      column <- which(template_sheet_i$validation==template$validation[i])
+      
+      dataValidation(wb, sheet=paste(template$sheet[i]),
+                     col = column,
+                     rows = 2:31, 
+                     type = "list", value = paste0("'",sheet_name_i,"'","!$A$2:$A$",length(sheet_content[,1]))
+      )
+    }
+  
+  
+
+  ###--------------------------------------------------------------------------
+  ### data validation: add validation from relational structure
+  ###--------------------------------------------------------------------------
+    if(str_detect(template$validation[i],"must_contain")){
+      #### refferences?
+      ref_sheet <- str_split_fixed(str_sub(template$validation[i],14,-2),"\\$",2)[1]
+      ref_column <- str_split_fixed(str_sub(template$validation[i],14,-2),"\\$",2)[2]
+      reff_sheet_data <- template %>%
+        filter(sheet == ref_sheet)
+      reff_column_nr <- which(reff_sheet_data[,2]==ref_column)
+      
+      template_sheet_i <- template %>%
+        filter(sheet == template$sheet[i])
+      column <- which(template_sheet_i$validation==template$validation[i])
+      
+      dataValidation(wb, sheet=paste(template$sheet[i]),
+                     col = column,
+                     rows = 2:maxN, 
+                     type = "list", 
+                     value = paste0("'",ref_sheet,"'",
+                                    "!$",LETTERS[reff_column_nr],
+                                    "$2:$"
+                                    ,LETTERS[reff_column_nr],
+                                    "$"
+                                    ,maxN)
+      )
+            
+}
+  ###-----------------------------------------------
+  ### Refferences and lookup - add refference columns 
+  ###-----------------------------------------------
+   if(str_detect(template$validation[i],"lookup")){
+     
+     template_sheet_i <- template %>% filter(sheet == template$sheet[i])
+      column <- which(template_sheet_i$validation==template$validation[i])
+     
+     vlookup_parts <- str_sub(template$validation[i],start=11,end=-3) # pick up formula part
+     reffreence_column <- column+as.numeric(str_sub(template$validation[i],start=8,end=9))
+     v2 <- paste0("VLOOKUP(", LETTERS[reffreence_column],2:maxN,",",vlookup_parts,",0)")
+     class(v2) <- c(class(v2), "formula")
+     
+     writeData(wb, sheet = paste(template$sheet[i]), x = v2, 
+               startCol = column, startRow = 2)
+     
+     style <- createStyle(fgFill = "#B7B7B7")
+     addStyle(wb, sheet = paste(template$sheet[i]), style=style, 
+              rows=1:maxN, cols=column, gridExpand = FALSE, stack = FALSE)
+     
+   }
+  
+  ###-----------------------------------------------
+  ### Unique values  - typically IDs 
+  ###-----------------------------------------------
+   if(str_detect(template$validation[i],"unique")){
+     ## hm..... 
+   }
+
+  ###-----------------------------------------------
+  ### Is date
+  ###-----------------------------------------------
+   if(str_detect(template$validation[i],"is_date")){
+        template_sheet_i <- template %>%
+        filter(sheet == template$sheet[i])
+      column <- which(template_sheet_i$validation==template$validation[i])
+      
+      dataValidation(wb, sheet=paste(template$sheet[i]),
+                     col = column,
+                     rows = 2:maxN, 
+                     type = "date",
+                     value = as.Date(Sys.Date()),
+                     operator = "lessThan"
+      )
+   }
+  
+     if(str_detect(template$validation[i],"is_year")){
+        template_sheet_i <- template %>%
+        filter(sheet == template$sheet[i])
+      column <- which(template_sheet_i$validation==template$validation[i])
+      
+      dataValidation(wb, sheet=paste(template$sheet[i]),
+                     col = column,
+                     rows = 2:maxN, 
+                     type = "whole",
+                     value = c(1000,as.numeric(str_sub(Sys.Date(),start=1,end=4))),
+                     operator = "between"
+      )
+     }
+  
+       if(str_detect(template$validation[i],"is_month")){
+        template_sheet_i <- template %>%
+        filter(sheet == template$sheet[i])
+      column <- which(template_sheet_i$validation==template$validation[i])
+      
+      dataValidation(wb, sheet=paste(template$sheet[i]),
+                     col = column,
+                     rows = 2:maxN, 
+                     type = "whole",
+                     value = c(1,12),
+                     operator = "between"
+      )
+       }
+  
+       if(str_detect(template$validation[i],"is_day")){
+        template_sheet_i <- template %>%
+        filter(sheet == template$sheet[i])
+      column <- which(template_sheet_i$validation==template$validation[i])
+      
+      dataValidation(wb, sheet=paste(template$sheet[i]),
+                     col = column,
+                     rows = 2:maxN, 
+                     type = "whole",
+                     value = c(1,31),
+                     operator = "between"
+      )
+   }
+  
+}
+
+```
 
 
 
-#writeDataTable(wb, sheet = 1, x = iris[1:30,])
-#writeData(wb, sheet = "lookup_IDs", x = sample(iris$Sepal.Length, 10))
+```{r save_file, echo=TRUE, results=FALSE}
 
-# enter datavalidation rules
-#dataValidation(wb, 1, col = 1, rows = 2:31, type = "list", value = "'Sheet 2'!$A$1:$A$10")
+##--------------------
+## Save file 
+##---------------------
 
 # random unique code for each workbook download
 workbookID <- stri_rand_strings(1,4,pattern="[A-Za-z0-9]") 
 workbook_name <- paste0("testform_",workbookID,".xlsx")
 workbook_name <- "testform.xlsx"
 # save/ dowload workbook
+
+
 saveWorkbook(wb, workbook_name, overwrite = TRUE)
 
 

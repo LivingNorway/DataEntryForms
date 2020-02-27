@@ -208,10 +208,13 @@ $(document).ready(function () {
 <li><p>Generators developed in R and implementented in shiny</p></li>
 </ul>
 </div>
-<div id="example" class="section level3">
-<h3>Example</h3>
+<div id="worlflow" class="section level3">
+<h3>Worlflow</h3>
+<div id="load-libraries-and-set-define-input-parameters-template-etc." class="section level4">
+<h4>1. load libraries and set define input parameters (template etc.)</h4>
 <pre class="r"><code>library(openxlsx) # use openxlsx (no nasty java dependencies)
 library(stringi)
+library(stringr)
 library(dplyr)</code></pre>
 <pre><code>## 
 ## Attaching package: 'dplyr'</code></pre>
@@ -221,44 +224,160 @@ library(dplyr)</code></pre>
 <pre><code>## The following objects are masked from 'package:base':
 ## 
 ##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(uuid)
+
+# innstillinger
+template_file &lt;- &quot;./data/templates/gillnet-surveys/NINA_gillnet_survey_template.csv&quot;
+maxN &lt;- 100
+template_folder &lt;- &quot;./data/templates/gillnet-surveys/&quot;
+
+## header style
+hs &lt;- createStyle(fontColour = &quot;#ffffff&quot;, fgFill = &quot;#4F80BD&quot;, halign = &quot;center&quot;, valign = &quot;center&quot;, textDecoration = &quot;Bold&quot;, border = &quot;TopBottomLeftRight&quot;, textRotation = 90)</code></pre>
+</div>
+<div id="create-workbook-sheets-and-column-names" class="section level4">
+<h4>2. Create workbook, sheets and column names</h4>
 <pre class="r"><code># create workbook and worksheets
-template_file &lt;- &quot;gillnet_survey_template.csv&quot;
-template &lt;- read.csv(paste0(&quot;./examples/templates/&quot;,template_file))
+template &lt;- read.csv(template_file)
 worksheets &lt;- unique(template$sheet)
 
 wb &lt;- createWorkbook()
 
-# add worksheets
+
+## add worksheets
 for(i in 1:length(worksheets)){
   addWorksheet(wb, paste(worksheets[i]))
+  setColWidths(wb, sheet = paste(worksheets[i]), cols=1:100, widths = &quot;auto&quot;)
 }
 
-# add column names
+## add column names
 for(i in 1:length(worksheets)){
   xxx &lt;- matrix(ncol=length(template$field_name_NO[template$sheet==paste(worksheets[i])])) %&gt;%
   as.data.frame()
   names(xxx) &lt;- as.character(template$field_name_NO[template$sheet==paste(worksheets[i])])
-  writeDataTable(wb, sheet = i, x = xxx, firstColumn=TRUE)
+  writeDataTable(wb, sheet = i, x = xxx, firstColumn=TRUE)#, headerStyle=hs)
+}</code></pre>
+</div>
+<div id="add-data-validation-lookup-columns-etc.." class="section level4">
+<h4>3. add data-validation, lookup columns etc..</h4>
+<p>Loops trough the “validation” column of the template sheet</p>
+<ul>
+<li>ID:UUID - generates a set of UUIDs (of length maxN) to be used as GUIDs for the ID, stores the resulting IDs in sepparate lookup sheets</li>
+<li>’*.csv’ - looks for files with controlled vocabulary. Using the first column of the table as refference</li>
+<li>must_contain - column must contain value, typically refferenceing ID of highter hiarcical structure</li>
+</ul>
+<pre class="r"><code>##--------------------------------------
+## add lookupdata and data validatation
+##--------------------------------------
+
+for(i in 1:length(template$validation)){
+  
+  ###-------------------------------------------
+  ### IDs - add UUID if validation = lookup:UUID
+  ###-------------------------------------------
+  if(template$validation[i]==&quot;ID:UUID&quot;){
+    addWorksheet(wb, paste0(&quot;l_&quot;,template$field_name_NO[i]))
+    writeData(wb, sheet = paste0(&quot;l_&quot;,template$field_name_NO[i]), 
+              x = c(paste(template$field_name_NO[i]),sapply(seq_along(1:maxN), UUIDgenerate))
+    )
+  }
+  
+
+  ###--------------------------------------------------------------------------
+  ### lookup tables: add validation from controlled vocabulary attached as file
+  ###--------------------------------------------------------------------------
+    if(template$validation[i] %in% list.files(template_folder)){
+      #### add lookupdata
+      sheet_name_i &lt;- str_sub(template$validation[i], end = -5)
+      sheet_content &lt;- read.csv(paste0(template_folder,&quot;/&quot;,template$validation[i]))
+      addWorksheet(wb, sheetName=sheet_name_i)
+      writeDataTable(wb, sheet = sheet_name_i, x = sheet_content)
+      
+      ####-------------------
+      #### add datavalidation
+      ####-------------------
+      template_sheet_i &lt;- template %&gt;%
+        filter(sheet == template$sheet[i])
+      column &lt;- which(template_sheet_i$validation==template$validation[i])
+      
+      dataValidation(wb, sheet=paste(template$sheet[i]),
+                     col = column,
+                     rows = 2:31, 
+                     type = &quot;list&quot;, value = paste0(&quot;'&quot;,sheet_name_i,&quot;'&quot;,&quot;!$A$2:$A$&quot;,length(sheet_content[,1]))
+      )
+    }
+  
+  
+
+  ###--------------------------------------------------------------------------
+  ### data validation: add validation from relational structure
+  ###--------------------------------------------------------------------------
+    if(str_detect(template$validation[i],&quot;must_contain&quot;)){
+      #### refferences?
+      ref_sheet &lt;- str_split_fixed(str_sub(template$validation[i],14,-2),&quot;\\$&quot;,2)[1]
+      ref_column &lt;- str_split_fixed(str_sub(template$validation[i],14,-2),&quot;\\$&quot;,2)[2]
+      reff_sheet_data &lt;- template %&gt;%
+        filter(sheet == ref_sheet)
+      reff_column_nr &lt;- which(reff_sheet_data[,2]==ref_column)
+      
+      template_sheet_i &lt;- template %&gt;%
+        filter(sheet == template$sheet[i])
+      column &lt;- which(template_sheet_i$validation==template$validation[i])
+      
+      dataValidation(wb, sheet=paste(template$sheet[i]),
+                     col = column,
+                     rows = 2:maxN, 
+                     type = &quot;list&quot;, 
+                     value = paste0(&quot;'&quot;,ref_sheet,&quot;'&quot;,
+                                    &quot;!$&quot;,LETTERS[reff_column_nr],
+                                    &quot;$2:$&quot;
+                                    ,LETTERS[reff_column_nr],
+                                    &quot;$&quot;
+                                    ,maxN)
+      )
+            
 }
+  ###-----------------------------------------------
+  ### Refferences and lookup - add refference columns 
+  ###-----------------------------------------------
+   if(str_detect(template$validation[i],&quot;lookup&quot;)){
+     
+     template_sheet_i &lt;- template %&gt;% filter(sheet == template$sheet[i])
+      column &lt;- which(template_sheet_i$validation==template$validation[i])
+     
+     vlookup_parts &lt;- str_sub(template$validation[i],start=11,end=-3) # pick up formula part
+     reffreence_column &lt;- column+as.numeric(str_sub(template$validation[i],start=8,end=9))
+     v2 &lt;- paste0(&quot;VLOOKUP(&quot;, LETTERS[reffreence_column],2:maxN,&quot;,&quot;,vlookup_parts,&quot;,0)&quot;)
+     class(v2) &lt;- c(class(v2), &quot;formula&quot;)
+     
+     writeData(wb, sheet = paste(template$sheet[i]), x = v2, 
+               startCol = column, startRow = 2)
+     
+     style &lt;- createStyle(fgFill = &quot;#B7B7B7&quot;)
+     addStyle(wb, sheet = paste(template$sheet[i]), style=style, 
+              rows=1:maxN, cols=column, gridExpand = FALSE, stack = FALSE)
+     
+   }
 
 
-# add lookupdata
+  
+}</code></pre>
+<pre><code>## Warning: NAs introduced by coercion
 
-
-
-#writeDataTable(wb, sheet = 1, x = iris[1:30,])
-#writeData(wb, sheet = &quot;lookup_IDs&quot;, x = sample(iris$Sepal.Length, 10))
-
-# enter datavalidation rules
-#dataValidation(wb, 1, col = 1, rows = 2:31, type = &quot;list&quot;, value = &quot;'Sheet 2'!$A$1:$A$10&quot;)
+## Warning: NAs introduced by coercion</code></pre>
+<pre class="r"><code>##--------------------
+## Save file 
+##---------------------
 
 # random unique code for each workbook download
 workbookID &lt;- stri_rand_strings(1,4,pattern=&quot;[A-Za-z0-9]&quot;) 
 workbook_name &lt;- paste0(&quot;testform_&quot;,workbookID,&quot;.xlsx&quot;)
-
+workbook_name &lt;- &quot;testform.xlsx&quot;
 # save/ dowload workbook
+
+
 saveWorkbook(wb, workbook_name, overwrite = TRUE)</code></pre>
 <pre><code>## Note: zip::zip() is deprecated, please use zip::zipr() instead</code></pre>
+</div>
 </div>
 </div>
 
