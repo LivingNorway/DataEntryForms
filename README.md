@@ -7,5 +7,5 @@ This project aims at providing a set of low-tec tools for easing data entry and 
 ## Tools
 The idea is to provide a set of standarized data-entry forms, in the form of spreadsheets with internal data validation procedures, and a pre-defined mapping to DwC and extentions. Different sampling protocols and survey types will have different requirements  
 
-![image](https://drive.google.com/open?id=1PynA9BnUpewSH9ubHUENJHu4nva_vtkq)
+![image](https://github.com/LivingNorway/DataEntryForms/blob/master/tools_and_flow.jpg)
 
